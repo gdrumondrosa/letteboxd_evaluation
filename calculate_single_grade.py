@@ -1,15 +1,13 @@
-from selenium import webdriver
-from selenium.common.exceptions import NoSuchElementException
-from selenium.webdriver.firefox.options import Options
-from selenium.webdriver.common.by import By
 import re
 import time
 import numpy as np
+from selenium import webdriver
+from selenium.webdriver.common.by import By
+from selenium.common.exceptions import NoSuchElementException
 
-options = Options()
-options = webdriver.FirefoxOptions()
+options = webdriver.ChromeOptions()
 options.add_argument('-headless')
-driver = webdriver.Firefox(options=options)
+driver = webdriver.Chrome(options=options)
 
 # Insira o nome do filme aqui
 film = ""
@@ -23,6 +21,8 @@ notas = []
 
 for secao in secoes:
     try: 
+        if len(notas) >= 10:
+            break
         nome = secao.find_element(By.CLASS_NAME,"ir")
         original_title = nome.get_attribute('data-original-title')
         match = re.search(r"\((\d+)%\)", original_title)
