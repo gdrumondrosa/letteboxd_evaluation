@@ -6,16 +6,16 @@ from selenium.webdriver.common.by import By
 from selenium.common.exceptions import NoSuchElementException
 
 options = webdriver.ChromeOptions()
-options.add_argument('-headless')
+#options.add_argument('-headless')
 driver = webdriver.Chrome(options=options)
 
 # Insira o nome do filme aqui
-film = ""
+film = "the-drama"
 
 driver.get("https://letterboxd.com/film/"+ film +"/")
 time.sleep(3)
 
-secoes = driver.find_elements(By.CLASS_NAME,"rating-histogram-bar")
+secoes = driver.find_element(By.CLASS_NAME,"rating-histogram").find_elements(By.CLASS_NAME,"cell")
 
 notas = []
 
@@ -23,7 +23,7 @@ for secao in secoes:
     try: 
         if len(notas) >= 10:
             break
-        nome = secao.find_element(By.CLASS_NAME,"ir")
+        nome = secao.find_element(By.TAG_NAME,"a")
         original_title = nome.get_attribute('data-original-title')
         match = re.search(r"\((\d+)%\)", original_title)
         percentage = int(match.group(1))
