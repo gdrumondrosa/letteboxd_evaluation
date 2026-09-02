@@ -1,45 +1,69 @@
 import re
-import time
 import numpy as np
 from selenium import webdriver
 from selenium.webdriver.common.by import By
-from selenium.common.exceptions import NoSuchElementException
-
-options = webdriver.ChromeOptions()
-#options.add_argument('-headless')
-driver = webdriver.Chrome(options=options)
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
+from selenium.common.exceptions import NoSuchElementException, TimeoutException
 
 # Insira o nome do filme aqui
-film = "the-drama"
+film = "big-time-movie"
+url = f"https://letterboxd.com/film/{film}/"
+wait_timeout = 30
 
-driver.get("https://letterboxd.com/film/"+ film +"/")
-time.sleep(3)
+options = webdriver.ChromeOptions()
+# options.add_argument("-headless")
+options.add_argument("--disable-blink-features=AutomationControlled")
+options.add_experimental_option("excludeSwitches", ["enable-automation"])
+options.add_experimental_option("useAutomationExtension", False)
 
-secoes = driver.find_element(By.CLASS_NAME,"rating-histogram").find_elements(By.CLASS_NAME,"cell")
+driver = webdriver.Chrome(options=options)
+wait = WebDriverWait(driver, wait_timeout)
 
-notas = []
+try:
+    driver.get(url)
 
-for secao in secoes:
-    try: 
-        if len(notas) >= 10:
-            break
-        nome = secao.find_element(By.TAG_NAME,"a")
-        original_title = nome.get_attribute('data-original-title')
-        match = re.search(r"\((\d+)%\)", original_title)
-        percentage = int(match.group(1))
-        notas.append(percentage)
-    except NoSuchElementException: 
-        notas.append(0)
+    # Cloudflare: página "Just a moment..." até o challenge passar
+    wait.until(lambda d: "just a moment" not in d.title.lower())
 
-print(f'Filme coletado com sucesso!')
+    # Histograma vem via CSI assíncrono (/csi/film/.../rating-histogram/)
+    histogram = wait.until(
+        EC.presence_of_element_located((By.CLASS_NAME, "rating-histogram"))
+    )
+    secoes = histogram.find_elements(By.CLASS_NAME, "cell")
 
-driver.quit()
+    notas = []
+    for secao in secoes:
+        try:
+            if len(notas) >= 10:
+                break
+            nome = secao.find_element(By.TAG_NAME, "a")
+            original_title = nome.get_attribute("data-original-title") or nome.get_attribute("title") or ""
+            match = re.search(r"\((\d+)%\)", original_title)
+            if not match:
+                notas.append(0)
+                continue
+            notas.append(int(match.group(1)))
+        except NoSuchElementException:
+            notas.append(0)
+
+    print("Filme coletado com sucesso!")
+except TimeoutException:
+    print(
+        f"Timeout após {wait_timeout}s. Possíveis causas:\n"
+        "- Cloudflare pedindo verificação (resolva no navegador e rode de novo)\n"
+        f"- Histograma ainda não carregou em {url}"
+    )
+    raise SystemExit(1)
+finally:
+    driver.quit()
+
 
 def calcular_nota_final(distribuicao):
     pesos = np.array([0.5, 1, 1.5, 2, 2.5, 3, 3.5, 4, 4.5, 5])
     votos = np.array(distribuicao)
     total_votos = np.sum(votos)
-    
+
     if total_votos == 0:
         return 0.0
 
@@ -54,6 +78,7 @@ def calcular_nota_final(distribuicao):
     nota_final = min(pesos, key=lambda x: abs(x - ajuste_extremo))
     return nota_final
 
+
 nota_final = calcular_nota_final(notas)
 
-print(f'A nota do filme {film} é {nota_final}')
+print(f"A nota do filme {film} é {nota_final}")
